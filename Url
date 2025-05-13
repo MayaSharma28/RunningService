@@ -1,0 +1,30 @@
+@Component
+@ConfigurationProperties(prefix = "endpoint-attribute-healthcheck")
+public class ServiceConfig {
+    private Map<String, String> services;
+
+    public Map<String, String> getServices() {
+        return services;
+    }
+
+    public void setServices(Map<String, String> services) {
+        this.services = services;
+    }
+}
+
+yml:
+
+endpoint-attribute-healthcheck:
+  services:
+    service1: http://localhost:8080/service1
+    service2: http://localhost:8080/service2
+
+main:
+
+@Autowired
+private ServiceConfig serviceConfig;
+
+public void getService(String entry) {
+    String url = serviceConfig.getServices().get(entry);
+}
+
