@@ -1,30 +1,427 @@
-@Component
-@ConfigurationProperties(prefix = "endpoint-attribute-healthcheck")
-public class ServiceConfig {
-    private Map<String, String> services;
+1. Understand the Business Use Case
+	•	What does the “Affiliate Account Information” API do?
+	•	Who uses it — internal services, third parties, customers?
+	•	What kind of data is returned? (e.g., name, account ID, affiliate details, status)
 
-    public Map<String, String> getServices() {
-        return services;
-    }
+⸻
 
-    public void setServices(Map<String, String> services) {
-        this.services = services;
-    }
-}
+2. Review API Contracts
+	•	Validate request/response schemas (using Swagger/OpenAPI).
+	•	Check required fields, data types, constraints.
+	•	Note any changes due to migration: new fields, removed fields, renamed keys, etc.
 
-yml:
+⸻
 
-endpoint-attribute-healthcheck:
-  services:
-    service1: http://localhost:8080/service1
-    service2: http://localhost:8080/service2
+3. Database Migration Impact Analysis
 
-main:
+Since data is migrated:
+	•	Identify old vs new DB schemas (source vs PostgreSQL).
+	•	Analyze if data types or constraints have changed.
+	•	Understand data sync flow between PostgreSQL and Yugabyte (replica lag, consistency).
+	•	Confirm if Yugabyte is read-only or eventually consistent.
 
-@Autowired
-private ServiceConfig serviceConfig;
+⸻
 
-public void getService(String entry) {
-    String url = serviceConfig.getServices().get(entry);
-}
+4. Functional Test Analysis
+
+Prepare test cases for:
+	•	Happy Path: Valid affiliate account info is fetched correctly.
+	•	Negative Tests:
+	•	Invalid/missing account ID.
+	•	Unauthorized access.
+	•	Data not found.
+	•	Boundary Conditions: Large inputs, special characters, etc.
+	•	Backward Compatibility: If older clients still hit the API, test for any breakages.
+
+⸻
+
+5. Data Validation Tests
+
+Since the data is migrated:
+	•	Write SQL queries to:
+	•	Validate data integrity between source and PostgreSQL.
+	•	Validate consistency between PostgreSQL and Yugabyte.
+	•	For every API call:
+	•	Cross-check API response vs DB record in PostgreSQL and Yugabyte.
+
+⸻
+
+6. API Automation Suggestions
+
+Use Rest Assured or Postman to:
+	•	Automate API test scenarios.
+	•	Add DB validation in Rest Assured (via JDBC) to validate data from Postgres/Yugabyte.
+
+⸻
+
+7. Performance Testing
+
+Use JMeter or Gatling to test:
+	•	API response times before and after migration.
+	•	Compare latency between PostgreSQL and Yugabyte if the replica is used for reads.
+	•	Test how the API handles load (100s-1000s of concurrent users).
+
+⸻
+
+8. Monitoring & Observability Checks
+	•	Check logs, error rates, and latency in tools like Splunk, AppDynamics, ELK.
+	•	Verify if DB query performance is good after migration (slow queries, indexing issues).
+
+⸻
+
+9. CI/CD Pipeline Analysis
+	•	Ensure tests are included in CI/CD pipelines (e.g., Jenkins).
+	•	Run DB validation scripts post-deployment as part of smoke testing.
+
+⸻
+
+10. Security & Access Control
+	•	Validate auth mechanisms (JWT, OAuth, API Keys).
+	•	Ensure sensitive affiliate data is masked or encrypted in transit (HTTPS) and at rest.
+	•	Validate role-based access for different user types.
+
+⸻
+
+Final Deliverables (Artifacts You Can Prepare):
+	1.	Test Strategy Document (specific to DB migration & API)
+	2.	Postman Collection or Rest Assured suite
+	3.	SQL Data Validation Scripts
+	4.	Test Coverage Report (functional + DB + perf)
+	5.	Bug Report/Analysis (if mismatches are found)
+Since you’ve already analyzed the core functionality — valid input fetching correct data via affiliate account ID and company code, and verified 200 responses with headers like client-id, channel, correlation-id via Bruno — here’s what else you should analyze from a thorough QA perspective:
+
+⸻
+
+1. Response Validation (Beyond Status 200)
+	•	Validate all fields in the response body:
+	•	Ensure all expected keys are present.
+	•	Field-level validations (data types, formats: dates, enums, etc.).
+	•	Optional vs mandatory fields.
+	•	Example Checks:
+	•	Affiliate ID should be a string or UUID.
+	•	Company code matches expected format (length, allowed characters).
+	•	Dates in ISO 8601 (e.g., 2025-05-14T10:30:00Z).
+
+⸻
+
+2. Negative Scenarios
+
+Test for proper error handling:
+	•	Invalid account ID or company code (e.g., 404 or 400 with descriptive message).
+	•	Missing parameters in request.
+	•	Invalid data types (e.g., numeric string instead of UUID).
+	•	Unauthorized/forbidden access (401/403).
+	•	SQL injection-type strings (security edge cases).
+	•	Expired/invalid tokens or missing headers like client-id.
+
+Check:
+	•	Correct status codes.
+	•	Informative error messages.
+	•	Standard error structure (like { "errorCode": "AFFILIATE_NOT_FOUND", "message": "..." }).
+
+⸻
+
+3. Header Validation
+
+Headers like client-id, channel, correlation-id must:
+	•	Be validated if mandatory or optional.
+	•	Influence logging/tracking:
+	•	Does correlation-id reflect in logs for traceability?
+	•	Test behavior with:
+	•	Missing headers
+	•	Malformed headers
+	•	Duplicate headers
+
+⸻
+
+4. Data Consistency
+	•	Cross-verify response data with:
+	•	PostgreSQL table directly via SQL query
+	•	Yugabyte replica (if API reads from there)
+	•	Validate whether recent updates in DB are reflected immediately or with lag (especially if Yugabyte is eventually consistent).
+
+⸻
+
+5. Performance/Latency
+	•	Note time taken for 200 responses.
+	•	Test under load (even basic: 10–50 threads) to see:
+	•	Spike in latency
+	•	DB slowness
+	•	Timeouts
+	•	Errors under load
+
+⸻
+
+6. Audit, Logging, and Traceability
+
+Ask:
+	•	Does this service log every request?
+	•	Is the correlation-id used to trace logs?
+	•	Are there audit logs for access to sensitive affiliate info?
+
+⸻
+
+7. Security Tests
+	•	Is authentication enforced correctly?
+	•	Token expiry handled gracefully?
+	•	Any PII (Personally Identifiable Info) in response?
+	•	Check for masking (e.g., email, phone).
+	•	Headers like client-id — test if they’re validated or just passed through.
+	•	Is the service rate-limited? (try hitting with repeated calls rapidly)
+
+⸻
+
+8. API Contract Stability
+	•	Compare actual response with the Swagger contract or Postman schema.
+	•	Track if there are any undocumented changes or hidden fields being exposed.
+
+⸻
+
+9. Compatibility Testing
+
+If the client systems are changing or data structure changed post migration:
+	•	Check how older consumers handle new/migrated data.
+	•	If new fields were introduced — are they backward-compatible?
+
+⸻
+
+10. Retry and Idempotency (if applicable)
+
+If this API is used in downstream flows:
+	•	Check what happens if the same request is sent multiple times (idempotency).
+	•	Analyze retry behavior — is it safe?
+Area
+Checked?
+Notes
+Valid request → 200 OK
+✅
+Done
+Response field validation
+☐
+Negative tests
+☐
+Mandatory headers test
+☐
+DB consistency (Postgres)
+☐
+DB replica (Yugabyte) test
+☐
+Latency / load behavior
+☐
+Security (auth, PII)
+
+☐
+Logging / correlation id
+☐
+Schema contract validation
+☐
+✅ What is a SOAP Interceptor?
+
+A SOAP interceptor is a mechanism (in frameworks like Spring WS, Apache CXF, etc.) that intercepts the SOAP request or response:
+	•	Before it’s sent to the backend service (request interceptor)
+	•	After it’s received (response interceptor)
+
+It can be used to:
+	•	Modify or validate headers
+	•	Log or mask data
+	•	Inject security tokens
+	•	Route or enrich messages
+
+⸻
+
+🔍 What to Analyze from a QA Perspective
+
+1. Integration Flow Validation
+	•	What is the source of truth? Does the SOAP service fetch account data, or is it cached/mirrored somewhere else?
+	•	Understand how the interceptor behaves:
+	•	Is it calling another system (e.g., legacy mainframe, ERP)?
+	•	Does it transform data before reaching your REST API?
+
+2. SOAP Request & Response Validation
+
+If possible, capture the raw SOAP messages:
+	•	Use tools like SoapUI, Wireshark, or application logs.
+	•	Validate:
+	•	Structure (WSDL-based contract)
+	•	Required SOAP headers
+	•	Input and output parameters
+
+3. Interceptors Logic
+	•	Check what the interceptor does:
+	•	Enriches request (adds headers/metadata)?
+	•	Filters or validates request (e.g., checks for valid account ID)?
+	•	Logs or masks sensitive data?
+
+Try these test cases:
+
+Scenario
+Expected Result
+Valid input sent to interceptor
+Correct response, enriched/processed as needed
+Missing/invalid SOAP headers
+Proper error returned (e.g., 400 or SOAP Fault)
+Malformed XML sent
+Interceptor rejects with SOAP fault
+Delay in downstream SOAP service
+REST API handles it with a timeout or fallback
+Retry on failure
+If retry logic exists, validate retry behavior
+4. Security Testing
+	•	Is the interceptor adding authentication tokens, client ID, etc.?
+	•	Test with missing or manipulated security headers.
+	•	Check if any sensitive data is logged by the interceptor (which shouldn’t happen).
+
+5. Performance & Timeout Handling
+	•	If the SOAP service is slow or fails, validate:
+	•	How long the interceptor waits
+	•	Whether proper timeouts, error messages, or fallbacks are triggered
+
+6. Error Handling / SOAP Faults
+	•	If something goes wrong in the SOAP service, it should return a SOAP Fault.
+	•	Validate that:
+	•	The fault is captured by the interceptor
+	•	The fault is translated into a meaningful error in the REST response (not just 500)
+
+⸻
+
+🛠️ Tools You Can Use
+	•	SoapUI: For testing SOAP services and sending custom XML requests.
+	•	Bruno / Postman: For REST part (but limited SOAP support).
+	•	Fiddler / Charles Proxy: To observe traffic if you don’t have backend access.
+	•	Spring Logs / Application Logs: Check for interceptor logging or errors.
+What Is a SOAP XML Payload?
+
+SOAP (Simple Object Access Protocol) uses XML-based messaging to send requests and receive responses between client and server.
+
+A typical SOAP message consists of:
+	•	Envelope: Root element
+	•	Header: Optional metadata (e.g., authentication, correlation ID)
+	•	Body: Actual request data
+
+⸻
+
+🧾 Sample SOAP Request XML (Affiliate Account Search)
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:acc="http://yourdomain.com/accountservice">
+   <soapenv:Header>
+      <acc:ClientId>my-client-id</acc:ClientId>
+      <acc:Channel>web</acc:Channel>
+      <acc:CorrelationId>123456789</acc:CorrelationId>
+   </soapenv:Header>
+   <soapenv:Body>
+      <acc:getAffiliateAccountDetails>
+         <acc:affiliateAccountId>AFF12345</acc:affiliateAccountId>
+         <acc:companyCode>XYZ001</acc:companyCode>
+      </acc:getAffiliateAccountDetails>
+   </soapenv:Body>
+</soapenv:Envelope>
+
+response:
+
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:acc="http://yourdomain.com/accountservice">
+   <soapenv:Body>
+      <acc:getAffiliateAccountDetailsResponse>
+         <acc:affiliateAccount>
+            <acc:affiliateAccountId>AFF12345</acc:affiliateAccountId>
+            <acc:companyCode>XYZ001</acc:companyCode>
+            <acc:accountStatus>ACTIVE</acc:accountStatus>
+            <acc:createdAt>2024-10-18T10:30:00Z</acc:createdAt>
+            <acc:modifiedAt>2025-05-01T15:45:00Z</acc:modifiedAt>
+         </acc:affiliateAccount>
+      </acc:getAffiliateAccountDetailsResponse>
+   </soapenv:Body>
+</soapenv:Envelope>
+
+Test Scenario
+Description
+Valid request
+Valid IDs should return 200 with data
+Missing affiliateAccountId
+Expect SOAP fault or 400 error
+Empty companyCode
+Validate response behavior
+Invalid format
+Send malformed XML and expect parser error
+Unauthorized
+Test missing/invalid headers (e.g., client ID)
+✅ Response-Level Checks
+	•	Data returned matches DB (PostgreSQL / Yugabyte).
+	•	Timestamps are in valid ISO format.
+	•	All expected fields are present and accurate.
+	•	No unexpected nulls or empty tags.
+	•	No PII leakage in logs if you intercept XML.
+Sample SOAP Request: Affiliate Account Search
+
+Imagine you’re sending a request to get account details:
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:acc="http://yourdomain.com/accountservice">
+   <soapenv:Header>
+      <acc:ClientId>my-client-id</acc:ClientId>
+      <acc:Channel>web</acc:Channel>
+      <acc:CorrelationId>123456789</acc:CorrelationId>
+   </soapenv:Header>
+
+   <soapenv:Body>
+      <acc:getAffiliateAccountDetails>
+         <acc:affiliateAccountId>AFF12345</acc:affiliateAccountId>
+         <acc:companyCode>XYZ001</acc:companyCode>
+      </acc:getAffiliateAccountDetails>
+   </soapenv:Body>
+</soapenv:Envelope>
+What You Are Asking for:
+
+“Hey service, please give me details for affiliate account AFF12345 from company XYZ001.”
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:acc="http://yourdomain.com/accountservice">
+   <soapenv:Body>
+      <acc:getAffiliateAccountDetailsResponse>
+         <acc:affiliateAccount>
+            <acc:affiliateAccountId>AFF12345</acc:affiliateAccountId>
+            <acc:companyCode>XYZ001</acc:companyCode>
+            <acc:accountStatus>ACTIVE</acc:accountStatus>
+            <acc:createdAt>2024-10-18T10:30:00Z</acc:createdAt>
+         </acc:affiliateAccount>
+      </acc:getAffiliateAccountDetailsResponse>
+   </soapenv:Body>
+</soapenv:Envelope>
+As a QA, What Should You Check?
+
+✅ Request Validation
+	•	Send correct and incorrect account IDs.
+	•	Try missing fields like company code or account ID.
+	•	Send invalid formats (e.g., special characters).
+
+✅ Header Validation
+	•	Is clientId, channel, correlationId required?
+	•	What happens if one is missing or incorrect?
+
+✅ Response Validation
+	•	Check that the account details returned are accurate.
+	•	Are the timestamps (createdAt, modifiedAt) correct?
+	•	Compare with the PostgreSQL/Yugabyte DB.
+
+✅ Fault Handling
+	•	When service fails (e.g., account not found), is a SOAP Fault returned?
+	•	Does the message clearly explain what went wrong?
+
+✅ Security
+	•	Do SOAP headers leak any sensitive info?
+	•	Do logs capture full request XML (and should they)?
+
+⸻
+
+🛠 Tools to Practice
+	1.	SoapUI (best for SOAP testing)
+	•	You can paste the XML request and hit send.
+	•	It will show the full SOAP response.
+	2.	Postman (limited support)
+	•	Add a raw text/xml body and set Content-Type: text/xml.
+
+
+
+
+
+
+
 
