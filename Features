@@ -1,0 +1,35 @@
+Feature: Retrieve account information for an affiliate
+
+  Scenario: Successfully return account information when valid headers are provided
+    Given the affiliate service endpoint "/affiliate/accounts" is available
+    And the request contains the header "X-Affiliate-Id" with value "AFF1234"
+    And the request contains a valid "Authorization" token
+    When a GET request is made to the service
+    And the service validates the headers successfully
+    And the service triggers an event to fetch account details
+    Then the response should return HTTP status 200 OK
+    And the response should contain all the account information for affiliate "AFF1234"
+
+
+Scenario: Reject the request when invalid headers are provided
+  Given the affiliate service endpoint "/affiliate/accounts" is available
+  And the request contains the header "X-Affiliate-Id" with value "INVALID_ID"
+  And the request contains an invalid "Authorization" token
+  When a GET request is made to the service
+  And the service fails to validate the headers
+  Then the response should return HTTP status 401 Unauthorized
+  And the response body should contain an error message "Invalid credentials or affiliate ID"
+
+Scenario Outline: Validate header combinations for account retrieval
+  Given the service "/affiliate/accounts" is available
+  And the request contains header "X-Affiliate-Id" with value "<affiliateId>"
+  And the request contains header "Authorization" with token "<authToken>"
+  When a GET request is made
+  Then the service should respond with status <statusCode>
+
+  Examples:
+    | affiliateId | authToken         | statusCode |
+    | AFF1234     | valid-token       | 200        |
+    | INVALID     | valid-token       | 401        |
+    | AFF1234     | invalid-token     | 401        |
+    |             |                   | 401        |
