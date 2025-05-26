@@ -1,0 +1,123 @@
+Feature: Fetch Affiliate Account Details from Affiliate Info Services
+
+  Scenario Outline: Validate affiliate account details based on input and headers
+    Given access to the valid url "<url>" with input ID "<id>" and company code "<companyCode>"
+    When the request is made to the affiliate services with company code "<companyCode>", channel "<channel>" and token type "<tokenType>"
+    Then the service should send the status code <statusCode> http code
+    And check the response "<response>" for company code "<companyCode>" and input type "<inputType>"
+
+    Examples:
+      | id              | companyCode | channel | tokenType     | statusCode | response             | url                       | inputType |
+      | Affiliateacctid | SCH         | MO      | system oauth  | 200        | affiliate response    | affiliate-info-services   | account   |
+
+import io.cucumber.java.en.*;
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static org.testng.Assert.*;
+
+public class AffiliateServiceSteps {
+
+    private String url;
+    private String inputId;
+    private String companyCode;
+    private String channel;
+    private String tokenType;
+    private Response response;
+
+    @Given("access to the valid url {string} with input ID {string} and company code {string}")
+    public void accessToValidUrl(String url, String inputId, String companyCode) {
+        this.url = "https://<base-host>/" + url; // Replace <base-host> with actual host
+        this.inputId = inputId;
+        this.companyCode = companyCode;
+    }
+
+    @When("the request is made to the affiliate services with company code {string}, channel {string} and token type {string}")
+    public void requestIsMade(String companyCode, String channel, String tokenType) {
+        this.channel = channel;
+        this.tokenType = tokenType;
+
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Authorization", getToken(tokenType)); // Simulated
+        headers.put("X-Company-Code", companyCode);
+        headers.put("X-Channel", channel);
+        headers.put("Content-Type", "application/json");
+
+        response = RestAssured
+                .given()
+                    .baseUri(url)
+                    .headers(headers)
+                    .queryParam("inputId", inputId)
+                    .queryParam("companyCode", companyCode)
+                .when()
+                    .get()
+                .then()
+                    .extract().response();
+    }
+
+    @Then("the service should send the status code {int} http code")
+    public void validateStatusCode(int expectedStatusCode) {
+        assertEquals(response.getStatusCode(), expectedStatusCode, "Unexpected status code");
+    }
+
+    @And("check the response {string} for company code {string} and input type {string}")
+    public void checkResponseForCompanyAndInputType(String expectedResponse, String companyCode, String inputType) {
+        String body = response.getBody().asString();
+        assertTrue(body.contains(companyCode), "Response doesn't contain expected company code");
+        assertTrue(body.contains(inputType), "Response doesn't contain expected input type");
+        assertTrue(body.contains(expectedResponse), "Response doesn't contain expected response content");
+    }
+
+    private String getToken(String tokenType) {
+        // This method should fetch or simulate token based on tokenType
+        if ("system oauth".equalsIgnoreCase(tokenType)) {
+            return "Bearer valid-system-oauth-token";
+        } else {
+            return "Bearer dummy-token";
+        }
+    }
+}
+alternate:
+import io.restassured.path.json.JsonPath;
+
+@And("check the response {string} for company code {string} and input type {string}")
+public void checkNestedResponse(String expectedResponse, String companyCode, String inputType) {
+    JsonPath json = response.jsonPath();
+
+    String actualCompanyCode = json.getString("data.companyCode");
+    String actualInputType = json.getString("data.inputType");
+    String affiliateName = json.getString("data.affiliateDetails.name");
+    String email = json.getString("data.affiliateDetails.contact.email");
+
+    assertEquals(actualCompanyCode, companyCode, "Company Code mismatch");
+    assertEquals(actualInputType, inputType, "Input Type mismatch");
+    assertNotNull(affiliateName, "Affiliate name is missing");
+    assertTrue(email.endsWith("@affiliate.com"), "Email domain mismatch");
+}
+
+@Attachment(value = "API Response", type = "application/json")
+public String attachResponseToAllure() {
+    return response.asPrettyString();
+}
+
+
+import io.cucumber.testng.AbstractTestNGCucumberTests;
+import io.cucumber.testng.CucumberOptions;
+
+@CucumberOptions(
+        features = "src/test/resources/features",
+        glue = "stepdefinitions",
+        plugin = {
+            "pretty",
+            "io.qameta.allure.cucumber7jvm.AllureCucumber7Jvm",
+            "html:target/cucumber-report.html"
+        },
+        monochrome = true
+)
+public class TestRunner extends AbstractTestNGCucumberTests {
+}
+mvn clean test
+allure serve allure-results
