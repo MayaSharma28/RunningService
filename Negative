@@ -1,0 +1,93 @@
+✅ Goal of a 401 Test
+
+A 401 Unauthorized response occurs when:
+	•	The user did not provide any token, or
+	•	The user provided an invalid or tampered token, or
+	•	The token is expired or revoked
+
+Your job is to simulate these situations and ensure the API correctly responds with a 401.
+
+⸻
+
+🧭 Strategy to Execute a 401 Test in BDD
+
+🔹 1. Use Case Understanding
+	•	Identify endpoints that require authentication (protected APIs).
+	•	Confirm what kind of auth is used: Bearer token, Basic Auth, API key, etc.
+
+⸻
+
+🔹 2. Define BDD Scenario
+
+The scenario should be high-level like:
+
+“When the client tries to access the protected endpoint without valid credentials, the server should reject the request with a 401 Unauthorized response.”
+
+⸻
+
+🔹 3. Ways to Trigger 401 (Test Ideas)
+Situation
+How to Simulate
+Notes
+🔸 Missing Token
+Don’t include Authorization header
+Most basic test
+🔸 Empty Token
+Send Authorization: Bearer 
+API should reject this
+🔸 Tampered Token
+Modify a character in a valid token
+e.g., add abc at the end or replace a digit
+🔸 Expired Token (if possible)
+Use a token that is known to be expired
+Useful if token expiry is short for test purposes
+🔸 Invalid Token Format
+Send gibberish like Authorization: Bearer 123xyz
+Should return 401 instead of 500
+🔸 Wrong Authentication Scheme
+Use Basic instead of Bearer, or vice versa
+e.g., Authorization: Basic xyz
+
+
+4. Prepare the Test Environment
+	•	Have a valid token ready for comparison.
+	•	Be able to manipulate headers manually (use Postman first if needed).
+	•	Know what a real 401 response looks like (status, body message).
+
+⸻
+
+🔹 5. Execute via BDD Framework
+
+Run your BDD test:
+	•	Scenario simulates tampered/missing/invalid token.
+	•	Validate response is 401 and not 403, 500, or 200.
+
+⸻
+
+✅ Example Approach for You:
+
+You have a valid bearer token:
+
+Authorization: Bearer eyJhbGciOi...
+To simulate 401:
+	•	Delete it entirely → simulates no token
+	•	Append “abc” → Bearer eyJhbGciOi...abc
+	•	Use “12345” instead of token → invalid format
+	•	Use expired token if you can fetch one
+
+⸻
+
+🧪 Bonus Tip: Difference Between 401 and 403
+
+Code
+Meaning
+When It Happens
+401
+Unauthorized
+You’re not logged in or token is invalid
+403
+Forbidden
+You are logged in, but not allowed
+
+So 401 = bad or missing credentials, not permissions.
+
