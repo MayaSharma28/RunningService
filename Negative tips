@@ -1,93 +1,68 @@
-✅ Goal of a 401 Test
+Scenario Outline: Validate negative header scenarios
+  Given I set "<header_name>" header to "<header_value>"
+  When I send GET request to /users/123
+  Then the response status should be 400
+  And the error message should indicate missing or invalid header
 
-A 401 Unauthorized response occurs when:
-	•	The user did not provide any token, or
-	•	The user provided an invalid or tampered token, or
-	•	The token is expired or revoked
+Examples:
+  | header_name             | header_value        |
+  | Content-Type            |                    |
+  | Authorization           | InvalidToken123     |
+  | X-Frame-Options         | wrong-option        |
+  | Content-Encoding        | abcdef              |
 
-Your job is to simulate these situations and ensure the API correctly responds with a 401.
+import io.cucumber.java.en.*;
+import io.restassured.response.Response;
+import java.util.HashMap;
+import java.util.Map;
 
-⸻
+import static io.restassured.RestAssured.*;
+import static org.hamcrest.Matchers.*;
 
-🧭 Strategy to Execute a 401 Test in BDD
+public class NegativeHeaderSteps {
 
-🔹 1. Use Case Understanding
-	•	Identify endpoints that require authentication (protected APIs).
-	•	Confirm what kind of auth is used: Bearer token, Basic Auth, API key, etc.
+    private Map<String, String> headers = new HashMap<>();
+    private Response response;
 
-⸻
+    @Given("I set header {string} with value {string}")
+    public void i_set_header_with_value(String headerName, String headerValue) {
+        headers.clear(); // clear previous header
+        if (!headerValue.isEmpty()) {
+            headers.put(headerName, headerValue);
+        }
+    }
 
-🔹 2. Define BDD Scenario
+    @When("I send a GET request to {string}")
+    public void i_send_a_get_request_to(String endpoint) {
+        response = given()
+                .headers(headers)
+                .when()
+                .get("https://api.example.com" + endpoint); // Replace with your base URI
+    }
 
-The scenario should be high-level like:
+    @Then("the response status code should be {int}")
+    public void the_response_status_code_should_be(Integer statusCode) {
+        response.then().statusCode(statusCode);
+    }
 
-“When the client tries to access the protected endpoint without valid credentials, the server should reject the request with a 401 Unauthorized response.”
-
-⸻
-
-🔹 3. Ways to Trigger 401 (Test Ideas)
-Situation
-How to Simulate
-Notes
-🔸 Missing Token
-Don’t include Authorization header
-Most basic test
-🔸 Empty Token
-Send Authorization: Bearer 
-API should reject this
-🔸 Tampered Token
-Modify a character in a valid token
-e.g., add abc at the end or replace a digit
-🔸 Expired Token (if possible)
-Use a token that is known to be expired
-Useful if token expiry is short for test purposes
-🔸 Invalid Token Format
-Send gibberish like Authorization: Bearer 123xyz
-Should return 401 instead of 500
-🔸 Wrong Authentication Scheme
-Use Basic instead of Bearer, or vice versa
-e.g., Authorization: Basic xyz
+    @And("the error message should contain {string}")
+    public void the_error_message_should_contain(String errorMessage) {
+        response.then().body("error", containsString(errorMessage));
+    }
+}
 
 
-4. Prepare the Test Environment
-	•	Have a valid token ready for comparison.
-	•	Be able to manipulate headers manually (use Postman first if needed).
-	•	Know what a real 401 response looks like (status, body message).
-
-⸻
-
-🔹 5. Execute via BDD Framework
-
-Run your BDD test:
-	•	Scenario simulates tampered/missing/invalid token.
-	•	Validate response is 401 and not 403, 500, or 200.
-
-⸻
-
-✅ Example Approach for You:
-
-You have a valid bearer token:
-
-Authorization: Bearer eyJhbGciOi...
-To simulate 401:
-	•	Delete it entirely → simulates no token
-	•	Append “abc” → Bearer eyJhbGciOi...abc
-	•	Use “12345” instead of token → invalid format
-	•	Use expired token if you can fetch one
-
-⸻
-
-🧪 Bonus Tip: Difference Between 401 and 403
-
-Code
-Meaning
-When It Happens
-401
-Unauthorized
-You’re not logged in or token is invalid
-403
-Forbidden
-You are logged in, but not allowed
-
-So 401 = bad or missing credentials, not permissions.
-
+Test Case
+Expected Result
+Missing Content-Type
+400 Bad Request or proper error response
+Invalid Authorization token
+401 Unauthorized
+Unsupported Content-Type (e.g. text/html)
+415 Unsupported Media Type
+Wrong X-Frame-Options value
+400 Bad Request or ignored
+Duplicate headers (e.g., two Authorization)
+Error or undefined behavior (log it)
+Header case sensitivity mismatch
+Should still work if server is compliant
