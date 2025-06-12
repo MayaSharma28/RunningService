@@ -1,0 +1,11 @@
+Suggestion: Please consider replacing System.out.println statements with a logging framework (e.g., SLF4J + Logback).
+
+🔍 System.out.println is not recommended in production or collaborative environments because:
+	•	It lacks log level control (info, debug, warn, error).
+	•	Logs can’t be filtered or redirected easily.
+	•	It clutters the console and makes debugging harder in large systems.
+
+✅ Logging frameworks:
+	•	Improve maintainability and observability.
+	•	Support structured logs and integration with tools like ELK/Splunk.
+	•	Allow environment-based logging level control.
